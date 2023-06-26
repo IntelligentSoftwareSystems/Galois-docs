@@ -6,7 +6,7 @@
 
 @section wl_intro Introduction
 
-Worklists are required to track work items in data-driven algorithms. A scheduling policy indicates the order by which work items are extracted from a worklist. Galois provides various scheduling policies in the namespace galois::worklists, which can be instantiated by providing one of them as the template parameter of galois::wl, an optional parameter to galois::for_each. Below we will cover Galois schedulers, starting from commonly used ones.
+Worklists are required to track work items in \term{data_driven_algo, "data-driven algorithms"}. A scheduling policy indicates the order by which work items are extracted from a worklist. Galois provides various scheduling policies in the namespace galois::worklists, which can be instantiated by providing one of them as the template parameter of galois::wl, an optional parameter to galois::for_each. Below we will cover Galois schedulers, starting from commonly used ones.
 
 @section chunked_wl Chunked Worklists
 
