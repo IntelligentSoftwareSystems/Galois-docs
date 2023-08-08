@@ -6,17 +6,33 @@
 
 @section wl_intro Introduction
 
-Worklists are required to track work items in \term{data_driven_algo, "data-driven algorithms"}. A scheduling policy indicates the order by which work items are extracted from a worklist. Galois provides various scheduling policies in the namespace galois::worklists, which can be instantiated by providing one of them as the template parameter of galois::wl, an optional parameter to galois::for_each. Below we will cover Galois schedulers, starting from commonly used ones.
+_Worklists_ are required to track work items in \term{data_driven_algo, "data-driven algorithms"}.
+Work items can be <tt>push</tt>ed into or <tt>pop</tt>ped from a worklist.
+
+A *scheduling policy* indicates the order by which work items are extracted from a worklist.
+Galois provides various scheduling policies in the namespace galois::worklists, which can be instantiated by providing one of them as the template parameter of galois::wl, an optional parameter to galois::for_each.
+Below we will cover Galois schedulers, starting from commonly used ones.
 
 @section chunked_wl Chunked Worklists
 
-Chunked worklists assign work items to threads one chunk at a time. Similarly, each thread accumulates new work in a chunk before putting it on the worklist. Chunking offers better scalability because threads can amortize the cost of their access to the shared worklist over the entire chunk. The user chooses the size of the chunk: A large chunk size means less contention on the shared worklist, but may lead to load-imbalance, while a small chunk size may increase the contention on the shared worklist.
+Chunked worklists assign work items to threads one chunk at a time.
+Similarly, each thread accumulates new work in a chunk before putting it on the worklist.
+Chunking offers better scalability because threads can amortize the cost of their access to the shared worklist over the entire chunk.
+The user chooses the size of the chunk: A large chunk size means less contention on the shared worklist, but may lead to load-imbalance, while a small chunk size may increase the contention on the shared worklist.
 
-The worklist of chunks itself can be organized in different ways, and we have observed that mapping the communication patterns of threads to the hardware-topology leads to more scalable implementations: 
+    **Implementation**
 
-- galois::worklists::ChunkFIFO (or galois::worklists::ChunkLIFO) maintains a single global queue (or stack) for chunks of work items.
-- galois::worklists::PerSocketChunkFIFO (or galois::worklists::PerSocketChunkLIFO) maintains a queue (or stack) of chunks per socket (multi-core processor) in the system. A thread tries to find a chunk in its local socket before stealing from other sockets. 
-- galois::worklists::PerThreadChunkFIFO (or galois::worklists::PerThreadChunkLIFO) maintains a queue (or stack) of chunks per thread. Normally threads steal work within their socket, and only the leader of a socket can steal from other sockets when its own socket is out of work.
+galois::worklists::ChunkFIFO (or galois::worklists::ChunkLIFO) maintains a single global queue (or stack) for chunks of work items.
+The worklist of chunks itself can be organized in different ways.
+We have observed that mapping the communication patterns of threads to the hardware-topology leads to more scalable implementations.
+
+@subsection pt_chunked_wl Per-Thread Chunked Worklist
+galois::worklists::PerThreadChunkFIFO (or galois::worklists::PerThreadChunkLIFO) maintains a queue (or stack) of chunks per thread.
+Normally threads steal work within their socket, and only the leader of a socket can steal from other sockets when its own socket is out of work.
+
+@subsection ps_chunked_wl Per-Socket Chunked Worklist
+galois::worklists::PerSocketChunkFIFO (or galois::worklists::PerSocketChunkLIFO) maintains a queue (or stack) of chunks per socket (multi-core processor) in the system.
+A thread tries to find a chunk in its local socket before stealing from other sockets.
 
 Below is an example of using chunked worklists from {@link lonestar/tutorial_examples/SSSPPushSimple.cpp}:
 
