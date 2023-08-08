@@ -45,6 +45,17 @@ list(JOIN DOXYFILE_SOURCE_DIR_LIST "\" \"" DOXYFILE_SOURCE_DIR)
 string(CONCAT DOXYFILE_SOURCE_DIR "\"" ${DOXYFILE_SOURCE_DIR} "\"")
 # DOXYFILE_OUTPUT_DIR
 set(DOXYFILE_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/doxygen)
+if(BUILD_DOCS STREQUAL "internal")
+  # EXTRACT_ANON_NSPACES
+  set(DOXYFILE_EXTRACT_ANON_NSPACES "YES")
+  # MACRO_EXPANSION
+  set(DOXYFILE_MACRO_EXPANSION "YES")
+  set(DOXYFILE_EXPAND_ONLY_PREDEF "YES")
+  set(DOXYFILE_EXPAND_AS_DEFINED "GALOIS_ATTRIBUTE_NOINLINE")
+else()
+  # EXCLUDE_SYMBOLS
+  set(DOXYFILE_EXCLUDE_SYMBOLS "*::internal")
+endif()
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in
     ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.in @ONLY)
@@ -57,7 +68,7 @@ add_custom_target(doxygen_docs
 add_dependencies(docs doxygen_docs)
 
 find_package(Sphinx)
-if(SPHINX_FOUND)
+if(SPHINX_FOUND AND BUILD_DOCS STREQUAL "external")  # breathe does not support features like anonymous namespaces
   set(SPHINX_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
   cmake_path(APPEND CMAKE_CURRENT_BINARY_DIR "sphinx" OUTPUT_VARIABLE SPHINX_DEFAULT_BUILD_DIR)
   set(SPHINX_BUILD_DIR ${SPHINX_DEFAULT_BUILD_DIR} CACHE PATH "Sphinx doc build path")
@@ -67,9 +78,10 @@ if(SPHINX_FOUND)
   add_custom_target(breathe_apidoc  # ALL
                   COMMAND breathe-apidoc -q -o ${BREATHE_APIDOC_DIR} ${DOXYFILE_XML_OUTPUT_DIR}
                   COMMAND rm -rf ${BREATHE_APIDOC_DIR}/namespace*  # Ad hoc to faulty namespace recognition
+                  # COMMAND find ${BREATHE_APIDOC_DIR} -iname "*anonymous__namespace*" -delete  # Ad hoc: breathe does not support anon nspaces
                   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
                   DEPENDS ${DOXYFILE_XML_OUTPUT_DIR}
-                  COMMENT "Generating documentation with Sphinx"
+                  COMMENT "Generating API references for Sphinx"
                   )
   set_property(TARGET breathe_apidoc APPEND PROPERTY ADDITIONAL_CLEAN_FILES ${BREATHE_APIDOC_DIR})
   add_dependencies(breathe_apidoc doxygen_docs)
