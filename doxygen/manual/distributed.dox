@@ -1,0 +1,139 @@
+/**
+\page distributed D-Galois
+
+\section dist_graph Distributed Graph
+
+A distributed graph is implemented as galois::graphs::DistGraph. Other than mining apps, it's further specialized as galois::graphs::NewDistGraphGeneric.
+
+Host-local graph vertices are relabeled with local IDs by galois::graphs::DistGraph::localToGlobalVector.
+Each host owns some vertices as masters. Mirrors occur after masters in the series of local vertices.
+The reversed global-to-local mapping is stored as galois::graphs::DistGraph::globalToLocalMap.
+
+Mirrors are grouped by host IDs in galois::graphs::DistGraph::mirrorNodes.
+
+`sharedNodes[host]` determines nothing to send or not.
+
+\section gluon_substrate Gluon Communication Substrate
+
+Galois uses Gluon (implemented as galois::graphs::GluonSubstrate) as the communication substrate.
+
+In current practice, Gluon is not instantiated explicitly but jointly with the [graph](#dist_graph) via distGraphInitialization().
+
+\subsection gluon_synchronization Synchronization
+
+Gluon uses [all-reduce](https://en.wikipedia.org/wiki/Collective_operation#All-Reduce) for synchronization.
+- The *reduce* phase reduces values from mirror proxies to the master proxy
+- The *broadcast* phase broadcast the canonical value (i.e. result of reduction) from the master proxy to mirror proxies
+
+The network interface is implemented as galois::runtime::NetworkInterface.
+- galois::runtime::NetworkInterface::sendTagged()
+- galois::runtime::NetworkInterface::flush()
+
+Buffers
+- galois::runtime::SerializeBuffer
+- galois::runtime::DeserializeBuffer
+
+Core process
+- syncExtract
+
+
+\subsection gluon_parameters Configuration parameters
+
+- #partitionAgnostic (`-partitionAgnostic`) When true, Gluon is partition-agnostic and the [partition-aware optimizations](#structural_optimization) are disabled. Default to `false`.
+- #commMetadata (`-metadata=...`) Communication metadata for exploiting temporal invariance to optimize communication, corresponding to #DataCommMode.
+    Default to *auto* (`noData`) which dynamically choose the metadata , among 
+    - "bitset" - Use bitset metadata always
+    - "offsets" - Use offsets metadata always
+    - "gids" - Use global IDs metadata always
+    - "none"(`onlyData`) - Do not use any metadata (sends non-updated values)
+
+
+\section gluon_synchronization_api Gluon Synchronization API (Application-specific)
+
+\subsection what_to_sync WHAT: Field to synchronize
+
+To specify what to synchronize, users need to specify a type that has the following interfaces
+(assume the type is named `S`):
+
+- The struct must have a public member type `S::ValTy`. This is the type of value to be synchronized.
+It can be one of the field types or a collection type of them. It affects how Gluon serialize objects.
+
+- GPU variants batch operation
+    - `extract_reset_batch()` and `extract_batch()`
+
+galois::InvalidBitsetFnTy
+
+- `B::is_vector_bitset()` whether the bitset is for vector fields
+
+
+- `B::get()` returns bitset for computation
+
+- `B::is_valid()` indicates whether the bitset needs to be reset/cleared.
+
+
+Some pre-defined structs can be found in SyncStructures.h.
+
+\subsection how_to_sync HOW: Reduction operator to use
+
+User needs to specify the reduction operator for synchronization.
+
+\subsection when_to_sync WHEN: Point of synchronization
+
+The synchronization is made by calling galois::graphs::GluonSubstrate::sync.
+
+There are 5 template parameters:
+
+- `writeLocation` and `readLocation` are hints for [communication optimization by exploiting structural invariants in the partitioning](#structural_optimization).
+The optimization is disabled when the Gluon substrate is set to be [partition-agnostic](#gluon_parameters).
+See #WriteLocation and #ReadLocation.
+
+- `SyncFnTy` is a user-defined type that specifies [how to synchronize](#how_to_sync).
+
+- `BitsetFnTy` is a bitset wrapper type that specifies [what to synchronize](#what_to_sync).
+The default implementation is semantically "nothing to synchronize".
+
+- `async` toggles asynchronous communication, default to `false` (i.e. synchronous communication).
+
+The only argument `loopName` is an identifier for performance statistics.
+
+\section communication_optimization Optimizing Communication
+
+\subsection structural_optimization Exploiting Structural Invariants of Partitions
+
+This optimization requires domain-specific knowledge of the application-specific computation.
+
+An application-specific \term{operator} may only read from/write to vertices that are the source/destination of edges.
+For example, a pull-stype SSSP relaxation operator reads from the \term{glossary_neighborhood, "neighbors"} (which are destinations) and
+write to the \term{active_elements, "active node"} (which is the source).
+If a vertex proxy does not have any incoming edges (due to partitioning policy),
+i.e., it's not a destination of any edges, the value of it will never be "pulled"/read and thus updating the value on such vertices
+is not necessary.
+On the other hand, if a proxy does not have any outgoing edges, it has nothing to "pull" and the value of it is never updated by the operator.
+Therefore, the corresponding phase (reduce or broadcast, depending on partitioning policy) can be eliminated to speedup communication.
+In this "write-source-read-destination" example,
+
+- when the partitioning policy is IEC, i.e., only masters can be destinations and
+mirrors are never read in the operator, only *reduce* happens and the *broadcast* phase (which updates mirrors) is eliminated
+- when the partitioning policy is OEC, i.e., only masters can be sources and
+mirrors are never written/updated by the operator, the *reduce* phase (which reduces mirror values) is eliminated and only *broadcast* happens.
+- Other partitioning policies have to do both *reduce* and *broadcast* to guarantee correctness.
+
+Similarly, a push-style SSSP relaxation operator is "write-destination-read-source".
+
+There are 9 combinations of #WriteLocation-#ReadLocation pairs.
+The pair serves as a hint of the operator property.
+
+\warning **Choosing the wrong pair confuses Gluon and may lead to incorrect results of the operator!**
+It's always safe to pass `writeAny` and `readAny` which disables the optimization (thus no performance gain).
+
+\todo A table of implications of different combinations to different partitioning policies
+
+
+\section gluon_statistics Output Statistics
+
+- Sync_<loopName>_<run_identifier>
+    - Reduce_<loopName>_<run_identifier>
+        - ReduceSend_<loopName>_<run_identifier>
+        - ReduceNumMessages__<loopName>_<run_identifier>
+
+*/

@@ -29,4 +29,9 @@ Performance Tuning of Galois Programs
 - \subpage profiling
 - \subpage tuning
 
+D-Galois
+========
+
+- \subpage distributed
+
 */

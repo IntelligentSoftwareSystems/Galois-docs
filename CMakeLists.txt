@@ -39,6 +39,7 @@ set(DOXYFILE_SOURCE_DIR_LIST
   ${GALOIS_ROOT}/libdist
   ${GALOIS_ROOT}/libcusp
   ${GALOIS_ROOT}/libgluon
+  ${GALOIS_ROOT}/lonestar/libdistbench
 )
 # DOXYFILE_SOURCE_DIR
 list(JOIN DOXYFILE_SOURCE_DIR_LIST "\" \"" DOXYFILE_SOURCE_DIR)
@@ -68,7 +69,8 @@ add_custom_target(doxygen_docs
 add_dependencies(docs doxygen_docs)
 
 find_package(Sphinx)
-if(SPHINX_FOUND AND BUILD_DOCS STREQUAL "external")  # breathe does not support features like anonymous namespaces
+find_program(BREATHE_APIDOC breathe-apidoc)
+if(SPHINX_FOUND AND BREATHE_APIDOC AND BUILD_DOCS STREQUAL "external")  # breathe does not support features like anonymous namespaces
   set(SPHINX_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
   cmake_path(APPEND CMAKE_CURRENT_BINARY_DIR "sphinx" OUTPUT_VARIABLE SPHINX_DEFAULT_BUILD_DIR)
   set(SPHINX_BUILD_DIR ${SPHINX_DEFAULT_BUILD_DIR} CACHE PATH "Sphinx doc build path")
